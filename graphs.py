@@ -433,6 +433,7 @@ def is_lp_min_affected_by_asymmetry():
     pp.show()
 
 def is_lp_lipschitz():
+    i = 0
     pass
 
 def initiateSymCirc(k):
