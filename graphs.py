@@ -4,6 +4,7 @@ import math, time
 import random
 import matplotlib.pyplot as pp
 
+
 def gcd(a,b):
     while b != 0:
         a, b = b, a % b
@@ -433,8 +434,110 @@ def is_lp_min_affected_by_asymmetry():
     pp.show()
 
 def is_lp_lipschitz():
-    i = 0
-    pass
+
+    prime = primes_list(2000, only_equal1mod4=True)[-1]
+    print ("prime : ", prime)
+    k = int((prime-1)/2)
+
+    def compare_1_constraint_difference():
+    
+        def initiateLP(prime):
+            p = prime
+            k = int((p-1)/2)
+            elimination_guys = drawRandomSymmetric(k)
+            all_guys = np.array(range(1,k))
+            complement_guys = np.sort(list(set(all_guys) - set(elimination_guys)))
+
+            constraint_to_add = [complement_guys[0], k-complement_guys[0]]
+            rows = np.concatenate(([0],complement_guys))
+            C_matrix = np.real(np.fft.fft(np.eye(k)))[ rows,:]
+            rows_plus1 = np.concatenate(([0], constraint_to_add,complement_guys))
+            Cplus1_matrix = np.real(np.fft.fft(np.eye(k)))[ rows_plus1 ,:]
+
+            c=np.zeros(k)
+            c[0]=-k*k
+            b_eq = np.zeros(int(k/2)+1)
+            b_eq[0] = 1/k
+            b_eq_plus1 = np.zeros(int(k/2)+3)
+            b_eq_plus1[0] = 1/k
+
+            return [C_matrix, Cplus1_matrix,c,b_eq, b_eq_plus1]
+        [A_eq, Aplus1_eq, c, b_eq, b_eq_plus1] = initiateLP(prime)
+        print ("received : ", A_eq.shape, c.shape, b_eq.shape)
+        print ("received +1 : ", Aplus1_eq.shape, b_eq_plus1.shape)
+        res = scipy.optimize.linprog(c, A_eq = A_eq, b_eq = b_eq, bounds=(0,None), method='highs-ipm' )
+        res_plus1 = scipy.optimize.linprog(c, A_eq = Aplus1_eq, b_eq = b_eq_plus1, bounds=(0,None), method='highs-ipm' )
+        print ("value of the LP : ", -res.fun)
+        print ("value of the LP+1 : ", -res_plus1.fun)
+        print ("norms of the vectors : ", np.linalg.norm(res.x), np.linalg.norm(res_plus1.x))
+        print ("norm of the difference : ", np.linalg.norm(res.x-res_plus1.x))
+
+        print ("dominance of 0 : ", res.x[0]/np.linalg.norm(res.x))
+        print ("dominance of 0+1 : ", res_plus1.x[0]/np.linalg.norm(res_plus1.x))
+        print ("cos(angle between the vectors) : ", np.dot(res.x, res_plus1.x)/(np.linalg.norm(res.x)*np.linalg.norm(res_plus1.x)))
+        print ("cos without first coordinate : ", np.dot(res.x[1:], res_plus1.x[1:])/(np.linalg.norm(res.x[1:])*np.linalg.norm(res_plus1.x[1:])))
+        print ("nb tight constraints : ", np.sum(np.abs(res.x)<1e-8))
+        print ("nb common tight constraints : ", np.sum((np.abs(res.x)<1e-10) * (np.abs(res_plus1.x)<1e-10)))
+
+    def trace_value_as_function_of_nb_constraints():
+        nb_runs=1
+        res_vec, norms_vec, norms_diff_vec, dominance_of_zero_vec = [], [], [], []
+        constraint_vec = np.array(range(1, int(k/2))); np.random.shuffle(constraint_vec)
+        constraint_vec_symm = k-constraint_vec
+        C_matrix= np.real(np.fft.fft(np.eye(k)[:,0])).reshape(1,k)
+        print ("initially C has size ", C_matrix.shape)
+        b_eq = np.array([1/k])
+        c=np.zeros(k); c[0]=-k*k
+        for (idx, i,j) in zip(range (constraint_vec.shape[0]),constraint_vec, constraint_vec_symm):
+            print ("on constraint ", idx)
+            C_matrix = np.concatenate((C_matrix,\
+                 np.real(np.fft.fft(np.eye(k)[:,i])).reshape(1,k),\
+                 np.real(np.fft.fft(np.eye(k)[:,j])).reshape(1,k)), axis=0)
+            print ("C_matrix has shape ", C_matrix.shape)
+            b_eq = np.concatenate((b_eq, np.array([0,0])), axis=0)
+            res = scipy.optimize.linprog(c, A_eq = C_matrix, b_eq = b_eq, bounds=(0,None), method='highs-ipm' )
+            res_vec.append(-res.fun)
+            norms_vec.append(np.linalg.norm(res.x))
+            if idx > 0:
+                norms_diff_vec.append(np.linalg.norm(res.x-res_old.x))
+            dominance_of_zero_vec.append(res.x[0]/np.linalg.norm(res.x))
+            res_old = res
+        fig, ax1 = pp.subplots()
+        #ax1.plot(np.array(range(1,int (k/2))), res_vec, label="value of the LP (#constraints)")
+        print ("dominance of 0 at 70 : ", dominance_of_zero_vec[70])
+        ax1.plot(np.array(range(1,int (k/2))), dominance_of_zero_vec, label="dominance of 0 (#constraints)", color='blue')
+        ax2 = ax1.twinx()
+        #ax2.plot(np.array(range(1,int (k/2))), norms_vec, label="norm of the vector (#constraints)", color='red')
+        #ax2.plot(np.array(range(2,int (k/2))), norms_diff_vec, label="norm of the difference", color='green')
+        ax1.legend(); ax2.legend()
+        pp.show()
+    
+    def trace_dominance_of_zero_with_half_constraints():
+        nb_runs=10
+        dominance_of_zero_vec = []
+        
+        primes = primes_list(2000, True)[15:]
+        for p in primes:
+            print ("on prime ", p)
+            k = int((p-1)/2)
+            count_dominanceof0= 0
+            for run in range(nb_runs):
+                [_,_,_,A_eq,c,b_eq]=initiateRandomMatrixPair(p,dual=False)
+                res = scipy.optimize.linprog(-c, A_eq = A_eq, b_eq = b_eq, bounds=(0,None), method='highs-ipm' )
+                count_dominanceof0 += res.x[0]/np.linalg.norm(res.x)
+            dominance_of_zero_vec.append(count_dominanceof0/nb_runs)
+
+        fig, ax1 = pp.subplots()
+        #ax1.plot(np.array(range(1,int (k/2))), res_vec, label="value of the LP (#constraints)")
+        ax1.plot(primes, dominance_of_zero_vec, label="dominance of 0 (#constraints)", color='blue')
+        #ax2 = ax1.twinx()
+        #ax2.plot(np.array(range(1,int (k/2))), norms_vec, label="norm of the vector (#constraints)", color='red')
+        #ax2.plot(np.array(range(2,int (k/2))), norms_diff_vec, label="norm of the difference", color='green')
+        ax1.legend(); #ax2.legend()
+        pp.show()
+    
+    compare_1_constraint_difference()
+
 
 def initiateSymCirc(k):
     aux = [0]
@@ -447,6 +550,8 @@ def initiateSymCirc(k):
             else:
                 Matrix[i,j]=-1
     return Matrix
-Lovasz_RandomGraphs(dual=False)
+#Lovasz_RandomGraphs(dual=False)
 #Lovasz_random_bound_no_lp()
 #is_lp_min_affected_by_asymmetry()
+is_lp_lipschitz()
+
