@@ -433,15 +433,8 @@ def is_lp_min_affected_by_asymmetry():
     pp.plot(k_vec, np.sqrt(np.log(k_vec)*k_vec))
     pp.show()
 
-def is_lp_lipschitz():
 
-    prime = primes_list(2000, only_equal1mod4=True)[-1]
-    print ("prime : ", prime)
-    k = int((prime-1)/2)
-
-    def compare_1_constraint_difference():
-    
-        def initiateLP(prime):
+def initiateLP_oneconstraintdifference(prime):
             p = prime
             k = int((p-1)/2)
             elimination_guys = drawRandomSymmetric(k)
@@ -462,7 +455,17 @@ def is_lp_lipschitz():
             b_eq_plus1[0] = 1/k
 
             return [C_matrix, Cplus1_matrix,c,b_eq, b_eq_plus1]
-        [A_eq, Aplus1_eq, c, b_eq, b_eq_plus1] = initiateLP(prime)
+        
+
+def is_lp_lipschitz():
+
+    prime = primes_list(1000, only_equal1mod4=True)[-1]
+    print ("prime : ", prime)
+    k = int((prime-1)/2)
+
+    def compare_1_constraint_difference():
+    
+        [A_eq, Aplus1_eq, c, b_eq, b_eq_plus1] = initiateLP_oneconstraintdifference(prime)
         print ("received : ", A_eq.shape, c.shape, b_eq.shape)
         print ("received +1 : ", Aplus1_eq.shape, b_eq_plus1.shape)
         res = scipy.optimize.linprog(c, A_eq = A_eq, b_eq = b_eq, bounds=(0,None), method='highs-ipm' )
@@ -503,40 +506,196 @@ def is_lp_lipschitz():
             dominance_of_zero_vec.append(res.x[0]/np.linalg.norm(res.x))
             res_old = res
         fig, ax1 = pp.subplots()
-        #ax1.plot(np.array(range(1,int (k/2))), res_vec, label="value of the LP (#constraints)")
-        print ("dominance of 0 at 70 : ", dominance_of_zero_vec[70])
-        ax1.plot(np.array(range(1,int (k/2))), dominance_of_zero_vec, label="dominance of 0 (#constraints)", color='blue')
-        ax2 = ax1.twinx()
-        #ax2.plot(np.array(range(1,int (k/2))), norms_vec, label="norm of the vector (#constraints)", color='red')
-        #ax2.plot(np.array(range(2,int (k/2))), norms_diff_vec, label="norm of the difference", color='green')
-        ax1.legend(); ax2.legend()
-        pp.show()
-    
-    def trace_dominance_of_zero_with_half_constraints():
-        nb_runs=10
-        dominance_of_zero_vec = []
+        ax1.plot(np.array(range(1,int (k/2))), res_vec, label="value of the LP (#constraints)")
+        #ax1.plot(np.array(range(1,int (k/2))), dominance_of_zero_vec, label="dominance of 0 (#constraints)", color='blue')
+        ax1.plot(np.array(range(1,int (k/2))), np.ones(int(k/2)-1)*np.sqrt(k), label="sqrt(k)", color='green')
         
-        primes = primes_list(2000, True)[15:]
-        for p in primes:
-            print ("on prime ", p)
-            k = int((p-1)/2)
-            count_dominanceof0= 0
-            for run in range(nb_runs):
-                [_,_,_,A_eq,c,b_eq]=initiateRandomMatrixPair(p,dual=False)
-                res = scipy.optimize.linprog(-c, A_eq = A_eq, b_eq = b_eq, bounds=(0,None), method='highs-ipm' )
-                count_dominanceof0 += res.x[0]/np.linalg.norm(res.x)
-            dominance_of_zero_vec.append(count_dominanceof0/nb_runs)
-
-        fig, ax1 = pp.subplots()
-        #ax1.plot(np.array(range(1,int (k/2))), res_vec, label="value of the LP (#constraints)")
-        ax1.plot(primes, dominance_of_zero_vec, label="dominance of 0 (#constraints)", color='blue')
+        # plot point half constraints
+        ax1.plot(int(k/4), res_vec[int(k/4)], marker='o', markersize=3, color="red")
+        
         #ax2 = ax1.twinx()
         #ax2.plot(np.array(range(1,int (k/2))), norms_vec, label="norm of the vector (#constraints)", color='red')
         #ax2.plot(np.array(range(2,int (k/2))), norms_diff_vec, label="norm of the difference", color='green')
         ax1.legend(); #ax2.legend()
         pp.show()
     
-    compare_1_constraint_difference()
+    def how_many_plus1_constraints():
+        nb_runs=1
+        res_vec, max_val_x, norm_vec = [], [], []
+        constraint_vec = np.array(range(1, int(k/2))); np.random.shuffle(constraint_vec)
+        constraint_vec_symm = k-constraint_vec
+        neg_constraint_vec, neg_constraint_vec_symm = constraint_vec[:int(k/4)], constraint_vec_symm[:int(k/4)]
+        pos_constraint_vec, pos_constraint_vec_symm = constraint_vec[int(k/4):], constraint_vec_symm[int(k/4):]
+        one_hot_neg_constraint = np.zeros(k); one_hot_neg_constraint[neg_constraint_vec] = -1 ; one_hot_neg_constraint[neg_constraint_vec_symm] = -1
+        v_neg =np.real( np.fft.fft(one_hot_neg_constraint))
+        
+        
+        for (idx, pos_cstr) in enumerate(pos_constraint_vec):
+            print ("on constraint ", idx+1, " / ", len(pos_constraint_vec))
+            one_hot_pos_constraint = np.zeros(k); one_hot_pos_constraint[pos_constraint_vec[:idx]] = 1 ; one_hot_pos_constraint[pos_constraint_vec_symm[:idx]] = 1
+            v_pos = np.real(np.fft.fft(one_hot_pos_constraint))
+            v = v_neg + v_pos
+            cols = np.concatenate(([0],pos_constraint_vec[idx:], pos_constraint_vec_symm[idx:]))
+            #print ("taking ", cols.shape[0], " columns")
+            C_matrix = np.real(np.fft.fft(np.eye(k)))[ :,cols]
+            c = np.zeros(cols.shape[0]); c[0]=1
+            res = scipy.optimize.linprog(c, A_ub = -C_matrix, b_ub = v, method='highs-ipm' )
+            res_vec.append(res.fun+1)
+            max_val_x.append(np.max(res.x[1:]))
+            norm_vec.append(np.linalg.norm(res.x[:]))
+            # print how many nonzero coordinates 
+            print ("nb coordinates >0.5*res.fun : ", np.sum(np.abs(res.x)>0.5*res.fun),"/ " ,c.shape[0])
+            
+            close_feasable_point = res.x ; close_feasable_point[1]=-1
+            fft_close_feasable_point = np.real(np.fft.fft(close_feasable_point))
+            new_cost = res.fun + 1 - np.min(fft_close_feasable_point)
+            print ("res.fun : ", res.fun, ", new_cost : ", new_cost)
+
+        fig, ax1 = pp.subplots()
+        ax1.plot(np.array(range(len(res_vec))), res_vec, label="value of the LP (# positive constraints added)")
+        ax1.plot(np.array(range(1,int (k/4)+1)), np.ones(int(k/4))*np.sqrt(k), label="sqrt(k)", color='green')
+        ax1.plot(np.array(range(1,int (k/4)+1)), np.ones(int(k/4))*2*np.sqrt(k), label="2*sqrt(k)", color='green')
+        # plot max value vector : 
+        #ax2 = ax1.twinx()
+        #ax2.plot(np.array(range(len(max_val_x))), max_val_x, label="max value of the vector (# positive constraints added)")
+        # plot norm of the vector
+        ax1.plot(np.array(range(len(norm_vec))), norm_vec, label="norm of the vector (# positive constraints added)", color='red')
+        
+        ax1.legend();# ax2.legend()
+        pp.show()
+            
+    def trace_dominance_of_zero_with_half_constraints():
+        nb_runs=10
+        dominance_of_zero_vec, val_of_zero_vec, maxval_without_zero_vec, prop_large_coor = [], [], [], []
+        
+        primes = primes_list(1000, True)[1:]
+        for p in primes:
+            print ("on prime ", p)
+            k = int((p-1)/2)
+            count_dominanceof0, count_valof0, count_maxval, count_large_coor= 0, 0, 0,0
+            for run in range(nb_runs):
+                [_,_,_,A_eq,c,b_eq]=initiateRandomMatrixPair(p,dual=False)
+                res = scipy.optimize.linprog(-c, A_eq = A_eq, b_eq = b_eq, bounds=(0,None), method='highs-ipm' )
+                count_dominanceof0 += res.x[0]/np.linalg.norm(res.x)
+                count_valof0 += -res.fun
+                count_maxval += np.max(res.x[1:]*(k**2))
+                count_large_coor += np.sum(res.x>2/(k**2))/k
+            val_of_zero_vec.append(count_valof0/nb_runs)
+            maxval_without_zero_vec.append(count_maxval/nb_runs)
+            dominance_of_zero_vec.append(count_dominanceof0/nb_runs)
+            prop_large_coor.append(count_large_coor/nb_runs)
+
+        fig, ax1 = pp.subplots()
+        #ax1.plot(np.array(range(1,int (k/2))), res_vec, label="value of the LP (#constraints)")
+        #ax1.plot(primes, dominance_of_zero_vec, label="dominance of 0 (#constraints)", color='blue')
+        #ax1.plot(primes, val_of_zero_vec, label="value of the 0 coor (prime)", color='red')
+        #ax1.plot(primes, maxval_without_zero_vec, label="max value of the vector without 0 (prime)", color='blue')
+        #ax1.plot(primes, np.sqrt((np.array(primes)-1)/2), label="sqrt(k)", color='green')
+        ax1.plot(primes, prop_large_coor, label="proportion of large coordinates", color='blue')
+        #ax2 = ax1.twinx()
+        #ax2.plot(np.array(range(1,int (k/2))), norms_vec, label="norm of the vector (#constraints)", color='red')
+        #ax2.plot(np.array(range(2,int (k/2))), norms_diff_vec, label="norm of the difference", color='green')
+        ax1.legend(); #ax2.legend()
+        pp.show()
+    
+
+def finding_a_good_correction_vector():
+    
+    def correction_vector (n, coor, constraint_vec=None):
+            b = np.zeros(shape= (n,))
+            h = coor     
+            '''for k in range(n):
+                b[k] = (k!=1) * np.cos(2*math.pi*k*h/n) 
+            g = np.real(np.fft.ifft(b))
+            if constraint_vec is not None:
+                g[constraint_vec] = 0
+            b = np.real(np.fft.fft(g))
+
+            max_g = np.max(g)
+            g /= max_g
+            b /= max_g'''
+
+            best_so_far, best_b, best_g, best_alpha = np.inf, None, None, None
+            for run in range(1,200):
+                alpha = run
+                for k in range(n):
+                    b[k] = (k!=1) * np.cos(2*math.pi*alpha*(k-h)/n)
+                if constraint_vec is not None:
+                    b[constraint_vec] = 0
+                g = np.real(np.fft.fft(b))
+                if np.max(g) < best_so_far:
+                    best_so_far = np.max(g)
+                    best_b, best_g, best_alpha = b, g, alpha
+            print ("g is the fft of b : ", np.allclose(best_g, np.real(np.fft.fft(best_b))))
+            print ("found best value for max g : ", best_so_far)
+            print ("at frequency : ", best_alpha)
+            print ("b verifies the condition : b[coor] = ", best_b[coor])
+            
+            
+            return best_b,best_g
+
+    
+    
+    def test_dirac_delta_perturbation():
+        n = 281     
+        b= correction_vector(n, 100)
+        # now introduce the correction that half the coordinates must be zero:
+        b *= np.random.binomial(1, 0.5, n)
+        g = np.real(np.fft.fft(b))
+
+        pp.plot(np.array(range(n))/n, g, color='blue')
+        pp.show()
+    
+    def make_dirac_correction():
+        prime = primes_list(1000, only_equal1mod4=True)[-1]
+        print ("prime : ", prime)
+        k = int((prime-1)/2)
+
+        constraint_vec = np.array(range(1, int(k/2))); np.random.shuffle(constraint_vec)
+        constraint_vec_symm = k-constraint_vec
+        neg_constraint_vec, neg_constraint_vec_symm = constraint_vec[:int(k/4)], constraint_vec_symm[:int(k/4)]
+        all_neg_constr = np.concatenate((neg_constraint_vec, neg_constraint_vec_symm), axis=None)
+        free_vars, free_vars_symm = constraint_vec[int(k/4):], constraint_vec_symm[int(k/4):]
+        one_hot_neg_constraint = np.zeros(k); one_hot_neg_constraint[neg_constraint_vec] = -1 ; one_hot_neg_constraint[neg_constraint_vec_symm] = -1
+        v_neg =np.real( np.fft.fft(one_hot_neg_constraint))
+        v = v_neg
+
+        cols = np.concatenate(([0],free_vars, free_vars_symm))
+        print ("taking ", cols.shape[0], " columns")
+        C_matrix = np.real(np.fft.fft(np.eye(k)))[ :,cols]
+        c = np.zeros(cols.shape[0]); c[0]=1
+        res = scipy.optimize.linprog(c, A_ub = -C_matrix, b_ub = v, bounds=None, method='highs-ipm' )
+
+        print ("cost is ", res.fun+1)
+        print ("sqrt k : ", np.sqrt(k))
+
+        # now add a new constraint with dirac correction
+            # draw a random index : 
+        idx = np.random.randint(1, free_vars.shape[0])
+        l = free_vars[idx]
+        print ("want to correct coordinate ", l)
+        print ("require to correct coordinate with value : ", res.x[l])
+        #pp.plot(range(res.x.shape[0]), res.x, color='blue')
+        #pp.show()
+        b,g = correction_vector(k, l , constraint_vec=all_neg_constr)
+        #g = g[:cols.shape[0]] # only keep the nonsymmetric part
+        pp.plot(range (int(k)), g, color='green')
+        pp.plot(range(int(k)), b, color='blue')
+
+        # the difference in cost is : 
+        print ("received b such that max(fft(b)) = ", np.max(np.real(np.fft.fft(b))) )
+        delta_cost = (res.x[l]+1)*np.max(np.real(np.fft.fft(b)))
+        print ("delta cost : ", delta_cost)
+
+        
+        
+        #pp.plot(range(2*cols.shape[0]),np.dot(C_matrix , res.x) +v, color='red')
+        pp.show()
+
+        
+    #test_dirac_delta_perturbation()
+    make_dirac_correction()
+    
 
 
 def initiateSymCirc(k):
@@ -550,8 +709,5 @@ def initiateSymCirc(k):
             else:
                 Matrix[i,j]=-1
     return Matrix
-#Lovasz_RandomGraphs(dual=False)
-#Lovasz_random_bound_no_lp()
-#is_lp_min_affected_by_asymmetry()
-is_lp_lipschitz()
 
+finding_a_good_correction_vector()
