@@ -413,11 +413,8 @@ def is_lp_min_affected_by_asymmetry():
             constrained_vec = np.zeros(k); constrained_vec[elimination_guys]=-1
             b = np.real(np.fft.fft(constrained_vec))
             c = np.zeros(len(complement_guys)+1); c[-1]=1
-            #np.real(np.fft.fft(np.eye(k)))[ np.concatenate(([0],elimination_guys)),:]
-            #print ("p is ", p , ", A has size ", A.shape)
-            #print ("c has len ", c.shape[0])
             A_ub = -A # we ensure -Ax-t <= b
-            A1 = A ; A1[:,-1]*= -1 # we will ensure Ax-t <= -b
+            A1 = A ; A1[:,-1]*= -1 # we also ensure Ax-t <= -b
             b1 = -b
 
             A_ub_symm = np.concatenate((A_ub, A1), axis=0)
@@ -433,6 +430,75 @@ def is_lp_min_affected_by_asymmetry():
     pp.plot(k_vec, np.sqrt(np.log(k_vec)*k_vec))
     pp.show()
 
+def is_lp_affected_by_boundedness_constraints():
+    primes = primes_list(1000, True)[3:]
+    #primes = [13]
+    nb_runs, res_vec, res_vec1 = 10, [], []
+    for p in primes:
+        count = 0
+        count1 = 0
+        print ("on prime ", p)
+        for run in range(nb_runs):
+            k=int((p-1)/2)
+            elimination_guys = drawRandomSymmetric(k)
+            all_guys = np.array(range(1,k))
+            complement_guys = np.sort(list(set(all_guys) - set(elimination_guys)))    
+            A = np.real(np.fft.fft(np.eye(k)))[ :,complement_guys]
+            A = np.append(A, np.ones(k).reshape(k,1), axis=1)
+            constrained_vec = np.zeros(k); constrained_vec[elimination_guys]=-1
+            b = np.real(np.fft.fft(constrained_vec))
+            c = np.zeros(len(complement_guys)+1); c[-1]=1
+            A_ub = -A # we ensure -Ax-t <= b
+            
+            res = scipy.optimize.linprog(c, A_ub=A_ub, b_ub=b, bounds=(None,None), method='highs-ipm' )
+
+            bound_size = 1
+            bound_vector_low, bound_vector_high = np.ones_like(c)-bound_size, np.ones_like(c)+bound_size; bound_vector_low[-1]=-k; bound_vector_high[-1]=k
+            bounds = list(zip(bound_vector_low, bound_vector_high))
+            #print ("bound_vector_low : ", bound_vector_low, ", bound_vector_high : ", bound_vector_high)
+            res_bd = scipy.optimize.linprog(c, A_ub=A_ub, b_ub=b,bounds=bounds,  method='highs-ipm')
+            #print ("res : ", res.fun, ", res_bd : ", res_bd.fun)
+            #print ("res.x : ", res.x, ", res_bd.x : ", res_bd.x)
+            #print ("b : ", b)
+            count += res.fun ; count1 += res_bd.fun
+        res_vec.append(count/nb_runs); res_vec1.append(count1/nb_runs)
+    k_vec = (np.array(primes)-1)/2
+    pp.plot(k_vec, res_vec, color='red', label="theta number")
+    pp.plot(k_vec, res_vec1, color='green', label= "theta number constraining all variables be in [0,2]")
+    pp.plot(k_vec, np.sqrt(k_vec))
+    #pp.plot(k_vec, np.sqrt(np.log(k_vec)*k_vec))
+    pp.legend()
+    pp.show()
+
+def glutton_method_for_lp():
+    primes = primes_list(500, True)
+    #primes = [13]
+    res_vec,check_vec,  nb_runs =[], [],10
+    for p in primes:
+        count = [0,0]
+        k=int((p-1)/2)
+        print ("on prime ", p, ", k = ", k)
+        for run in range(nb_runs):
+            elimination_guys = drawRandomSymmetric(k); all_guys = np.array(range(1,k)) # nonfree coor
+            complement_guys = np.sort(list(set(all_guys) - set(elimination_guys))) # free coordinates
+            
+            x = np.ones(k); x[elimination_guys] = -1 ; x[0]=0 ; v = np.real(np.fft.fft(x)) ; check_val = np.max(np.abs(v))
+            current_res = None; current_x = x; current_v = v
+            for (idx, i) in zip(range(len(complement_guys)), complement_guys):
+                e_i = np.zeros(k); e_i[i] = 1; w_i = np.real(np.fft.fft(e_i))
+                cost = np.array([1, 0]); A_ub = np.array([-np.ones(2*k), np.concatenate((w_i,-w_i))]).T; b_ub = np.concatenate((-current_v,current_v))
+                current_res = scipy.optimize.linprog(cost, A_ub=A_ub, b_ub=b_ub, method='highs-ipm')
+                current_x[i] = current_res.x[1]; current_v += current_res.x[1]*w_i
+            count[0] += current_res.fun ; count[1] += check_val   
+            
+        res_vec.append(count[0]/nb_runs)
+        check_vec.append(count[1]/nb_runs)
+    k_vec = (np.array(primes)-1)/2
+    pp.plot(k_vec, res_vec, color='red')
+    pp.plot(k_vec, np.sqrt(k_vec), color='green')
+    pp.plot(k_vec, np.sqrt(np.log(k_vec)*k_vec), color='blue')
+    pp.plot(k_vec, check_vec, color='black')
+    pp.show()
 
 def initiateLP_oneconstraintdifference(prime):
             p = prime
@@ -710,4 +776,5 @@ def initiateSymCirc(k):
                 Matrix[i,j]=-1
     return Matrix
 
-finding_a_good_correction_vector()
+if __name__ == "__main__":
+    is_lp_affected_by_boundedness_constraints()
