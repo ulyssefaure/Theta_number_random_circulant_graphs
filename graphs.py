@@ -4,6 +4,7 @@ import math, time
 import random
 import matplotlib.pyplot as pp
 
+## Filip's code ##
 
 def gcd(a,b):
     while b != 0:
@@ -115,6 +116,13 @@ def drawRandomSymmetric(k):
         aux_2 = aux + aux_1
     return aux_2
 
+def drawRandomSymmetricBoth(k, include0 = False):
+    v = np.array(range((1 if not include0 else 0), k)); np.random.shuffle(v)
+    v_symm = k-v
+    in_ = np.concatenate((v[:k//2], v_symm[:k//2]))
+    out_= np.concatenate((v[k//2:], v_symm[k//2:]))
+    return in_, out_        
+
 def initiateRandomMatrix(p):
     k=int((p-1)/2)
     elimination_guys = drawRandomSymmetric(k)
@@ -151,44 +159,8 @@ def initiateRandomComplementMatrix(p):
 
     return [C_matrix,c,b_eq]
 
-def initiateRandomMatrixPair(p, dual=False):
-    k=int((p-1)/2)
-    elimination_guys = drawRandomSymmetric(k)
-    all_guys = np.array(range(1,k))
-    complement_guys = np.sort(list(set(all_guys) - set(elimination_guys)))
-
-    #complement guys = indices i of vertices such that {0,i} is in the complement of G
-    #for p = 1(mod 4), we have |complement_guys|=1+|elimination_guys|
-    #print ("complement : ", complement_guys, ", elim : ", elimination_guys)
-    
-    C_matrix = np.real(np.fft.fft(np.eye(k)))[ np.concatenate(([0],complement_guys)),:]
-    C1_matrix = np.real(np.fft.fft(np.eye(k)))[ np.concatenate(([0],elimination_guys)),:]
-
-    if not dual:
-        c=np.zeros(k)
-        c[0]=k*k
-        b_eq = np.zeros(int(k/2)+1)
-        b_eq[0] = 1/k
-        c1=np.zeros(k)
-        c1[0]=k*k
-
-        b1_eq = np.zeros(int(k/2))
-        b1_eq[0] = 1/k
-    else:
-        c=np.ones(k)/k
-        b_eq = np.ones(int(k/2))*(-k)
-        C_matrix = C_matrix[1:, :] # drop the 1s first row
-        c1=np.ones(k)/k
-        b1_eq = np.ones(int(k/2)-1)*(-k)
-        C1_matrix = C1_matrix[1:,:] # drop the row of 1s.
-        
-        
-
-    return [C1_matrix,c1,b1_eq,C_matrix,c,b_eq]
-
 def Lovasz_PaleyGraphs():
     prime = [61,109,173,281,293,353,373,421,457,541,673,733,757,761,773,797,821,829,877,997,1009]
-    #prime = [73]
 
     for p in prime:
         [primitive_root,quadratic_residue,elimination_guys,no_elimination_guys] = quadraticResidueAndMore(p)
@@ -199,17 +171,13 @@ def Lovasz_PaleyGraphs():
 
         result = scipy.optimize.linprog((-1)*c, A_eq = (-1)*A_eq, b_eq = (-1)*b_eq, bounds=(0,None) )
         result1 = scipy.optimize.linprog((-1)*c1, A_eq = (-1)*A_eq1, b_eq = (-1)*b_eq1, bounds=(0,None) )
-        """print((len(np.nonzero(result.x)[0])+len(np.nonzero(result1.x)[0]))*2)"""
+
         print(len(np.nonzero(result.x)[0]))
         print(len(np.nonzero(result1.x)[0]))
         print(np.intersect1d(np.nonzero(result.x),np.nonzero(result1.x)))
-        #print(len(np.nonzero(result1.x)[0]))
-        #print("---------------")
-        """print(result.x,result.fun)
-        print(np.nonzero(result.x))
-        print(np.nonzero(result1.x))
-        print(elimination_guys)"""
+       
         print(result.fun-result1.fun)
+
         """print(result.x)
         print(result1.x)
         print(np.intersect1d(np.nonzero(result.x),np.nonzero(result1.x)))"""
@@ -228,7 +196,6 @@ def Lovasz_PaleyGraphs():
     print(np.nonzero(result1.x))
     print(no_elimination_guys)"""
 
-
 def primes_list(n, only_equal1mod4 = False):
     odds = range(3, n+1, 2)
     sieve = set(sum([list(range(q*q, n+1, q+q)) for q in odds], []))
@@ -238,8 +205,48 @@ def primes_list(n, only_equal1mod4 = False):
         return [p for p in odds if (p not in sieve and p%4==1)]
 
 
+#######################
+
+def initiateRandomMatrixPair(p, dual=False):
+    ''' initiates the matrices for the LP, using the primal or dual formulation
+    (\ ref{theta-max-hat} or \ ref{theta-min-hat} respectively) '''
+    # efficient initialization
+    k=int((p-1)/2)
+    elimination_guys = drawRandomSymmetric(k)
+    all_guys = np.array(range(1,k))
+    complement_guys = np.sort(list(set(all_guys) - set(elimination_guys)))
+ 
+    C_matrix = np.real(np.fft.fft(np.eye(k)))[ np.concatenate(([0],complement_guys)),:]
+    C1_matrix = np.real(np.fft.fft(np.eye(k)))[ np.concatenate(([0],elimination_guys)),:]
+
+    if not dual:
+        # \label{theta-max-hat}
+        c=np.zeros(k)
+        c[0]=k*k
+        b_eq = np.zeros(int(k/2)+1)
+        b_eq[0] = 1/k
+        c1=np.zeros(k)
+        c1[0]=k*k
+
+        b1_eq = np.zeros(int(k/2))
+        b1_eq[0] = 1/k
+    else:
+        # \label{theta-min-hat}
+        c=np.ones(k)/k
+        b_eq = np.ones(int(k/2))*(-k)
+        C_matrix = C_matrix[1:, :] # drop the 1s first row
+        c1=np.ones(k)/k
+        b1_eq = np.ones(int(k/2)-1)*(-k)
+        C1_matrix = C1_matrix[1:,:] # drop the row of 1s.
+        
+        
+
+    return [C1_matrix,c1,b1_eq,C_matrix,c,b_eq]
 
 def Lovasz_RandomGraphs(dual=False):
+    '''computes the Lovasz number and various statistics of the solution for random
+    circulant graphs of prime order, using the primal or dual formulation
+    (\ ref{theta-max-hat} or \ ref{theta-min-hat} respectively)''' 
     #primes = [61,109,173,281,293,353,373,421,457,541,673,733,757, 1997]
     primes = [primes_list(2000, only_equal1mod4=True)[-1]]
     #primes = [13]
@@ -256,26 +263,16 @@ def Lovasz_RandomGraphs(dual=False):
         for i in range(0,nb_runs):
             [A_eq,c,b_eq,A1_eq,c1,b1_eq]=initiateRandomMatrixPair(prime, dual)
             sign = -1 if not dual else 1 # to feed into linprog (min, max..)
-            #print ("A1_eq : ", A1_eq.shape, " c1.shape : ", c1.shape, ", b1_eq.shape : ", b1_eq.shape)
-            #result = scipy.optimize.linprog(sign*c, A_eq = A_eq, b_eq = b_eq, bounds=(0,None), method='highs-ipm' )
+
             result1= scipy.optimize.linprog(sign*c1, A_eq = A1_eq, b_eq = b1_eq, bounds=(0,None), method='highs-ipm' )
             
-            result = result1 # DO NOT KEEP : THIS IS JUST TO SPEED UP PROGRAM, DO 1 LP AND NOT 2 
+            result = result1 # DO NOT KEEP : THIS IS JUST TO SPEED UP PROGRAM, DO 1 LP AND NOT 2 (else add result=scipy.linprog(...))
 
             if dual and isinstance(result.fun, float):
                 result1.fun += 1
             elif not isinstance(result.fun, float):
                 print ("result is not a float...")
             res = result if not dual else result1
-            #result1 = scipy.optimize.linprog(sign*c1, A_eq = (-1)*A1_eq, b_eq = (-1)*b1_eq, bounds=(0,None) )
-            
-            #if isinstance(result.fun, float) & isinstance(result1.fun, float):
-                #rm_result.append(result.fun)
-                #rm_comp_result.append(result1.fun)
-                #difference.append(float(result.fun)-float(result1.fun))
-            #print ("value : ", -result.fun)
-
-            #analyse_value_lp(result, dual)
 
             print ("on run : ", i)
             k = c1.shape[0] # size of graph
@@ -294,17 +291,13 @@ def Lovasz_RandomGraphs(dual=False):
                 rm_result.append(sign*res.fun)
 
         rm_result = np.sort(rm_result)
-        #rm_comp_result = np.sort(rm_comp_result)
-        #difference = np.sort(difference)
+        
         variances_reg.append(np.var(rm_result))
         mean_val_result.append(np.mean(rm_result))
 
         counts, bins = np.histogram(fft_vec, bins=50)
-        #counts, bins = np.histogram(rm_result, bins=50)
         pp.stairs(counts, bins)
         pp.show()
-        #variances_comp.append(np.var(rm_comp_result))
-        #variances_diff.append(np.var(difference))
         print("\n\n\n")
         print("The following results are for p = ",prime)
 
@@ -327,9 +320,8 @@ def Lovasz_RandomGraphs(dual=False):
     #pp.show()
 
 def analyse_value_lp(result, dual=False):
-    #print ("best vec : ", result.x)
-
     
+    #print ("best vec : ", result.x)
     k = result.x.shape[0] # size of the graph
 
     if not dual: 
@@ -357,12 +349,15 @@ def Lovasz_random_bound_no_lp():
         for run in range(nb_runs):
             k = int((prime-1)/2)
             size = int(np.ceil((k-1)/2)) 
-            bernoulli_vec = -2*np.random.binomial(1, 0.5, size=size)+1
+            bernoulli_vec = -2*np.random.binomial(1, 0.5, size=size)+1 # signed bernoulli vec
             bernoulli_vec = np.concatenate(([0], bernoulli_vec, np.flip(bernoulli_vec[:-1])), axis=None)
             ber_fft = np.real(np.fft.fft(bernoulli_vec)) # np.real() is not necessary by symmetry (but it avoids a warning)
-            max_ber_fft = np.max(np.abs(ber_fft))
+            
+            max_ber_fft = np.max(np.abs(ber_fft)) # this records the value of the feasible point where the free variables are 1, should be O(n \log n)
 
-            # matrix formulation : any better ?
+            # matrix formulation : any better ? 
+            # (test a random point for \ref{theta-lambda-min} and \ref{theta-lambda-max}), putting gaussians at free spots
+            # (no, it's not better than n \log n)
             matrixA, matrixB = np.empty(shape=(k,k)), np.empty(shape=(k,k))
             bernoulli_vecA = (1-0.5*(bernoulli_vec + 1)) # here, =0 if not in graph
             ber_vec_B = 1-bernoulli_vecA; ber_vec_B[0]=1 # here, =0 if IN graph
@@ -396,8 +391,10 @@ def Lovasz_random_bound_no_lp():
     pp.show()
 
 def is_lp_min_affected_by_asymmetry():
+    ''' this function draws the theta number of random circulant graphs for
+    1) the regular theta number and 2) theta_infty, where we minimize |Fx|_infty. It shows
+    2) is not much bigger than 1).'''
     primes = primes_list(1000, True)
-    #primes = [13]
     nb_runs, res_vec, res_vec1 = 10, [], []
     for p in primes:
         count = 0
@@ -424,19 +421,24 @@ def is_lp_min_affected_by_asymmetry():
             count += res.fun ; count1 += res_symm.fun
         res_vec.append(count/nb_runs); res_vec1.append(count1/nb_runs)
     k_vec = (np.array(primes)-1)/2
-    pp.plot(k_vec, res_vec, color='red')
-    pp.plot(k_vec, res_vec1, color='green')
+    pp.plot(k_vec, res_vec, color='red') # only optimising min Fx
+    pp.plot(k_vec, res_vec1, color='green') # optimising |Fx|_infty
     pp.plot(k_vec, np.sqrt(k_vec))
     pp.plot(k_vec, np.sqrt(np.log(k_vec)*k_vec))
     pp.show()
 
-def is_lp_affected_by_boundedness_constraints():
-    primes = primes_list(1000, True)[3:]
+def is_lp_affected_by_boundedness_constraints(dual = False):
+    ''' this function tests how much imposing the free variables to be in 1 + [-bound_size, bound_size]
+    affects the value of theta'''
+    
+    # if not dual, we impose the free variables to be in 1 + [-bound_size, bound_size]
+    # if dual, we penalise by the max norm of the free variables
+
+    primes = primes_list(1200, True)[3:]
     #primes = [13]
-    nb_runs, res_vec, res_vec1 = 10, [], []
+    nb_runs, res_vec, res_vec1, free_var_size_vec = 10, [], [],[]
     for p in primes:
-        count = 0
-        count1 = 0
+        count, count1, count_free_var_size = 0,0,0
         print ("on prime ", p)
         for run in range(nb_runs):
             k=int((p-1)/2)
@@ -450,27 +452,64 @@ def is_lp_affected_by_boundedness_constraints():
             c = np.zeros(len(complement_guys)+1); c[-1]=1
             A_ub = -A # we ensure -Ax-t <= b
             
+            # compute the normal theta number
             res = scipy.optimize.linprog(c, A_ub=A_ub, b_ub=b, bounds=(None,None), method='highs-ipm' )
 
-            bound_size = 1
-            bound_vector_low, bound_vector_high = np.ones_like(c)-bound_size, np.ones_like(c)+bound_size; bound_vector_low[-1]=-k; bound_vector_high[-1]=k
-            bounds = list(zip(bound_vector_low, bound_vector_high))
-            #print ("bound_vector_low : ", bound_vector_low, ", bound_vector_high : ", bound_vector_high)
-            res_bd = scipy.optimize.linprog(c, A_ub=A_ub, b_ub=b,bounds=bounds,  method='highs-ipm')
-            #print ("res : ", res.fun, ", res_bd : ", res_bd.fun)
-            #print ("res.x : ", res.x, ", res_bd.x : ", res_bd.x)
-            #print ("b : ", b)
+            if not dual:
+                #now compute the theta number with these new bounds
+                bound_size = 2
+                bound_vector_low, bound_vector_high = np.ones_like(c)-bound_size, np.ones_like(c)+bound_size; bound_vector_low[-1]=-k; bound_vector_high[-1]=k
+                bounds = list(zip(bound_vector_low, bound_vector_high))
+                res_bd = scipy.optimize.linprog(c, A_ub=A_ub, b_ub=b,bounds=bounds,  method='highs-ipm')
+            else:
+                # now we penalise by the infinity norm of the free variables (x):
+                # add columns in A : we guarantee -l < x < l, ie. x-l<=0 and -x-l<=0 (omitting the t column)
+                A1 = np.eye(c.shape[0]+1)[:-2,:]; A1[:,-1] = -1
+                A2 = -np.eye(c.shape[0]+1)[:-2,:]; A2[:,-1] = -1
+
+                # concatenate everything:
+                A_ub = np.concatenate((A_ub, np.zeros((A_ub.shape[0],1))), axis=1)
+                A_ub = np.concatenate((A_ub, A1, A2), axis=0)
+
+                # adapt b
+                b = np.concatenate((b, np.zeros(A1.shape[0] + A2.shape[0])), axis=0)
+                # add a variable in c
+                c = np.concatenate((c, [1]))
+                res_bd = scipy.optimize.linprog(c, A_ub=A_ub, b_ub=b,bounds=(None,None),  method='highs-ipm')
+                free_variables_size_cost = res_bd.x[-1]
+                #print ("res_bd.x : ", res_bd.x)
+            #print ("normal theta number : ", res.fun, ", theta number penalising : ", res_bd.fun)
+
             count += res.fun ; count1 += res_bd.fun
+            if dual:
+                count_free_var_size += free_variables_size_cost
+            
         res_vec.append(count/nb_runs); res_vec1.append(count1/nb_runs)
+        if dual:
+            free_var_size_vec.append(count_free_var_size/nb_runs)
+    
+    # plotting :
+    fig, ax1 = pp.subplots()
     k_vec = (np.array(primes)-1)/2
-    pp.plot(k_vec, res_vec, color='red', label="theta number")
-    pp.plot(k_vec, res_vec1, color='green', label= "theta number constraining all variables be in [0,2]")
-    pp.plot(k_vec, np.sqrt(k_vec))
-    #pp.plot(k_vec, np.sqrt(np.log(k_vec)*k_vec))
-    pp.legend()
+    ax1.plot(k_vec, res_vec, color='red', label="theta number")
+    if not dual:
+        label = "theta number constraining all variables be in ["+str(1-bound_size)+","+str(1+bound_size)+"]"
+    else:
+        label = "theta number penalising the infinity norm of the free variables"
+    ax1.plot(k_vec, res_vec1, color='green', label= label)
+    ax1.plot(k_vec, np.sqrt(k_vec), label="sqrt(k)")
+    #pp.plot(k_vec, np.sqrt(np.log(k_vec)*k_vec), label="sqrt(k log(k))")
+    if dual:
+        # plot free_var_size on separate axis as dotted line
+        ax2 = ax1.twinx()
+        ax2.plot(k_vec, free_var_size_vec, color='blue', label="infinity norm of the free variables", linestyle='dotted')
+    
+    fig.legend()
     pp.show()
 
 def glutton_method_for_lp():
+    ''' this method tests whether we can solve the LP by optimizing the free variables one by one, in a single run
+    (the answer is no)'''
     primes = primes_list(500, True)
     #primes = [13]
     res_vec,check_vec,  nb_runs =[], [],10
@@ -501,35 +540,38 @@ def glutton_method_for_lp():
     pp.show()
 
 def initiateLP_oneconstraintdifference(prime):
-            p = prime
-            k = int((p-1)/2)
-            elimination_guys = drawRandomSymmetric(k)
-            all_guys = np.array(range(1,k))
-            complement_guys = np.sort(list(set(all_guys) - set(elimination_guys)))
+    ''' initiaties two sets of matrices and vectors for the LP where the second one is the same except it has a single constraint more than the first '''
+    p = prime
+    k = int((p-1)/2)
+    elimination_guys = drawRandomSymmetric(k)
+    all_guys = np.array(range(1,k))
+    complement_guys = np.sort(list(set(all_guys) - set(elimination_guys)))
 
-            constraint_to_add = [complement_guys[0], k-complement_guys[0]]
-            rows = np.concatenate(([0],complement_guys))
-            C_matrix = np.real(np.fft.fft(np.eye(k)))[ rows,:]
-            rows_plus1 = np.concatenate(([0], constraint_to_add,complement_guys))
-            Cplus1_matrix = np.real(np.fft.fft(np.eye(k)))[ rows_plus1 ,:]
+    constraint_to_add = [complement_guys[0], k-complement_guys[0]]
+    rows = np.concatenate(([0],complement_guys))
+    C_matrix = np.real(np.fft.fft(np.eye(k)))[ rows,:]
+    rows_plus1 = np.concatenate(([0], constraint_to_add,complement_guys))
+    Cplus1_matrix = np.real(np.fft.fft(np.eye(k)))[ rows_plus1 ,:]
 
-            c=np.zeros(k)
-            c[0]=-k*k
-            b_eq = np.zeros(int(k/2)+1)
-            b_eq[0] = 1/k
-            b_eq_plus1 = np.zeros(int(k/2)+3)
-            b_eq_plus1[0] = 1/k
+    c=np.zeros(k)
+    c[0]=-k*k
+    b_eq = np.zeros(int(k/2)+1)
+    b_eq[0] = 1/k
+    b_eq_plus1 = np.zeros(int(k/2)+3)
+    b_eq_plus1[0] = 1/k
 
-            return [C_matrix, Cplus1_matrix,c,b_eq, b_eq_plus1]
+    return [C_matrix, Cplus1_matrix,c,b_eq, b_eq_plus1]
         
 
 def is_lp_lipschitz():
-
+    ''' test whether the LP is Lipschitz continuous with respect to the constraints in various ways.'''
+    
     prime = primes_list(1000, only_equal1mod4=True)[-1]
     print ("prime : ", prime)
     k = int((prime-1)/2)
 
     def compare_1_constraint_difference():
+        ''' compares the value and optimal vectors for two LPs that differ by a single constraint'''
     
         [A_eq, Aplus1_eq, c, b_eq, b_eq_plus1] = initiateLP_oneconstraintdifference(prime)
         print ("received : ", A_eq.shape, c.shape, b_eq.shape)
@@ -549,6 +591,7 @@ def is_lp_lipschitz():
         print ("nb common tight constraints : ", np.sum((np.abs(res.x)<1e-10) * (np.abs(res_plus1.x)<1e-10)))
 
     def trace_value_as_function_of_nb_constraints():
+        ''' plots the value of the LP as we add constraints '''
         nb_runs=1
         res_vec, norms_vec, norms_diff_vec, dominance_of_zero_vec = [], [], [], []
         constraint_vec = np.array(range(1, int(k/2))); np.random.shuffle(constraint_vec)
@@ -586,6 +629,7 @@ def is_lp_lipschitz():
         pp.show()
     
     def how_many_plus1_constraints():
+        ''' plots the value of the LP as we force more and more free coordinates to be exactly 1'''
         nb_runs=1
         res_vec, max_val_x, norm_vec = [], [], []
         constraint_vec = np.array(range(1, int(k/2))); np.random.shuffle(constraint_vec)
@@ -631,6 +675,8 @@ def is_lp_lipschitz():
         pp.show()
             
     def trace_dominance_of_zero_with_half_constraints():
+        ''' plots the value of the LP compared to the norm of the best feasable vector (what we call 'dominance of 0'), 
+        numerically theta/||x|| is close to 0.38. The setting is there are exactly n//2 constraints.'''
         nb_runs=10
         dominance_of_zero_vec, val_of_zero_vec, maxval_without_zero_vec, prop_large_coor = [], [], [], []
         
@@ -666,6 +712,9 @@ def is_lp_lipschitz():
     
 
 def finding_a_good_correction_vector():
+    ''' looks for various ways to find a 'correction vector',
+    ie. a perturbation of the best vector making a LP with one more constraint feasible
+    while only raising theta by a little''' 
     
     def correction_vector (n, coor, constraint_vec=None):
             b = np.zeros(shape= (n,))
@@ -698,9 +747,7 @@ def finding_a_good_correction_vector():
             print ("b verifies the condition : b[coor] = ", best_b[coor])
             
             
-            return best_b,best_g
-
-    
+            return best_b,best_g 
     
     def test_dirac_delta_perturbation():
         n = 281     
@@ -722,7 +769,7 @@ def finding_a_good_correction_vector():
         neg_constraint_vec, neg_constraint_vec_symm = constraint_vec[:int(k/4)], constraint_vec_symm[:int(k/4)]
         all_neg_constr = np.concatenate((neg_constraint_vec, neg_constraint_vec_symm), axis=None)
         free_vars, free_vars_symm = constraint_vec[int(k/4):], constraint_vec_symm[int(k/4):]
-        one_hot_neg_constraint = np.zeros(k); one_hot_neg_constraint[neg_constraint_vec] = -1 ; one_hot_neg_constraint[neg_constraint_vec_symm] = -1
+        one_hot_neg_constraint = np.zeros(k); one_hot_neg_constraint[all_neg_constr] = -1
         v_neg =np.real( np.fft.fft(one_hot_neg_constraint))
         v = v_neg
 
@@ -730,7 +777,7 @@ def finding_a_good_correction_vector():
         print ("taking ", cols.shape[0], " columns")
         C_matrix = np.real(np.fft.fft(np.eye(k)))[ :,cols]
         c = np.zeros(cols.shape[0]); c[0]=1
-        res = scipy.optimize.linprog(c, A_ub = -C_matrix, b_ub = v, bounds=None, method='highs-ipm' )
+        res = scipy.optimize.linprog(c, A_ub = -C_matrix, b_ub = v, bounds=(None,None), method='highs-ipm' )
 
         print ("cost is ", res.fun+1)
         print ("sqrt k : ", np.sqrt(k))
@@ -758,13 +805,44 @@ def finding_a_good_correction_vector():
         #pp.plot(range(2*cols.shape[0]),np.dot(C_matrix , res.x) +v, color='red')
         pp.show()
 
+    def dirac_best_cost():
+
+        # this computes how large (close to 0) we can make \min F\delta under the constraints 
+        # that \delta_j = -1 and \delta_constr = 0
+        prime = primes_list(4000, only_equal1mod4=True)[-1]
+        print ("prime : ", prime)
+        k = int((prime-1)/2)
+
+        constraint_vec = np.array(range(1, int(k/2))); np.random.shuffle(constraint_vec)
+        constraint_vec_symm = k-constraint_vec
+        zero_constraint_vec, zero_constraint_vec_symm = constraint_vec[1:int(k/4)], constraint_vec_symm[1:int(k/4)]
+        all_zero_constr = np.concatenate((zero_constraint_vec, zero_constraint_vec_symm), axis=None)
+        new_constr = np.array([constraint_vec[0], k-constraint_vec[0]])
+        free_vars, free_vars_symm = constraint_vec[int(k/4):], constraint_vec_symm[int(k/4):]
+        one_hot_zero_constraint = np.zeros(k); one_hot_zero_constraint[all_zero_constr] = 0
+        one_hot_zero_constraint[new_constr] = -1
+        v_delta =np.real( np.fft.fft(one_hot_zero_constraint))
+        v = v_delta
+
+        cols = np.concatenate(([0],free_vars, free_vars_symm))
+        print ("taking ", cols.shape[0], " columns")
+        C_matrix = np.real(np.fft.fft(np.eye(k)))[ :,cols]
+        c = np.zeros(cols.shape[0]); c[0]=1
+        res = scipy.optimize.linprog(c, A_ub = -C_matrix, b_ub = v, bounds=(None,None), method='highs-ipm' )
+
+        print ("'largest' possible value for \min F\delta is ", res.fun)
+        # histogram of res.x :
+        pp.hist(v, bins=50)
+        res_x_without_zero = res.x ; res_x_without_zero[0]=0
+        pp.hist(C_matrix @ res_x_without_zero + v, bins=50)
+        pp.show()
         
-    #test_dirac_delta_perturbation()
-    make_dirac_correction()
+    dirac_best_cost()
     
 
 
 def initiateSymCirc(k):
+    ''' produces a random circulant sign matrix '''
     aux = [0]
     coordinates = drawRandomSymmetric(k)+aux
     Matrix = np.zeros((k,k))
@@ -777,4 +855,4 @@ def initiateSymCirc(k):
     return Matrix
 
 if __name__ == "__main__":
-    is_lp_affected_by_boundedness_constraints()
+    finding_a_good_correction_vector()

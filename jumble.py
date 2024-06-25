@@ -3,7 +3,9 @@ import matplotlib.pyplot as pp
 import affine_max_norm_min as aff
 import time
 import scipy.stats as stats
-# Verifying the following conjecture : the maximum value of a random orthonormal basis is of order sqrt(log(n)/n)
+import graphs
+
+# Verifying the following conjecture : the maximum value of a random orthonormal basis (the sup norm of the matrix) is of order sqrt(log(n)/n)
 # (this is true if the following graph is bounded by a constant)
 def order_of_max_val_rand_onb():
     max_val_vec, mean_vec = [], []
@@ -45,7 +47,7 @@ def order_of_max_val_proj_rand_onb():
     pp.legend()
     pp.show()
 
-# Draw a random onb; multiply the first vector by a chi distribution with n dof (call it v);
+# Draw a random ONB; multiply the first vector by a chi distribution with n dof (call it v);
 # define x = sign(v)*(norm v)^2/(norm v)_1; project x on the first K vectors of the onb;
 # return the maximum value of the projection
 def max_val_proj_rand_onb(n, K, U = None):
@@ -73,6 +75,7 @@ def max_val_proj_rand_onb_plot ():
 
 
 def number_of_discrete_sols():
+    #plotting the number of solutions to |Fx|< c sqrt(n) when the free variables are either 0 or 2
     n = 30
     nb_free_entries = n//2
 
@@ -142,7 +145,65 @@ def number_of_discrete_sols():
     plot_quotient_for_varying_n()
 
 
-if __name__== "__main__":
-    number_of_discrete_sols()
+def size_of_F_scal_y():
 
+    nb_runs = 100
+    n = 1000
+    res_vec = np.empty((nb_runs,2))
+    for run in range(nb_runs):
+        free, constr = graphs.drawRandomSymmetricBoth(n)
+        # one-hot vectors :
+        oh_free = np.zeros(n); oh_free[free] = 1
+        oh_constr = np.zeros(n); oh_constr[constr] = 1
+
+        # now take Y random gaussian of size constr
+        K = 10
+        y = np.random.uniform(low=-K, high=K, size=len(free))
+        Y = np.zeros(n); Y[free] = y
+
+
+        ber_vec = oh_free - oh_constr
+        index = 2
+        Fx, FY = np.fft.fft(ber_vec), np.fft.fft(Y)
+        res_vec[run,:] = (np.abs(Fx[index]), np.abs(FY[index]))
+
+        print("norm of FY : ", np.linalg.norm(FY))
+        print("norm of Fx : ", np.linalg.norm(Fx))
+
+    # now histogram both components of res_vec
+    pp.hist(res_vec[:,0], bins=20, color="blue", label= "F_2 scal x")
+    pp.hist(res_vec[:,1], bins=20, color = "red", label= "F_2 scal Y")
+    pp.legend()
+    pp.show()
+
+
+def approx_e_i():
+    n = 2000
+    i= np.random.randint(low=1, high=1999, size=1); e_i = np.sum(np.eye(n)[:,i], axis=1)
+    u = np.fft.ifft(e_i)
+    u = np.real(u)
+    # random true/false vector of length n:
+    random_vec = np.random.choice([0,1], n)
+    keep = (u>0)*(random_vec==1)
+    print ("keeping : ", np.sum(keep), " out of ", n)
+    u[np.array(1-keep, dtype=bool)] = 0
+    g = np.fft.fft(u)
+    print ("norm of u, g : ", np.linalg.norm(u), np.linalg.norm(g))
+    #pp.hist(e_i, bins=20, color="red")
+    pp.hist(g, bins=80,  color="blue")
+    pp.show()
+
+def entropy():
+    n = 2900000
+    oneoverp = np.linspace(start=1, stop=n, num=100) ; p= 1/oneoverp
+    entropy_vec = np.floor(1/p)*p*np.log(1/p) - (1-np.floor(1/p)*p)*np.log(1-np.floor(1/p)*p)
+    norm_vec = 1/p
+    pp.scatter(entropy_vec, norm_vec)
+    # trace an affine line from (0,1) to (log n, n)
+    pp.plot([0, np.log(n)], [1, n], linestyle="--")
+    pp.plot([np.log(n)*0.95, np.log(n)], [1, n], linestyle="--")
+    pp.show()
+
+if __name__== "__main__":
+    entropy()
         
