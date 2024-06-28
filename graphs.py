@@ -320,7 +320,7 @@ def Lovasz_RandomGraphs(dual=False):
     #pp.show()
 
 def analyse_value_lp(result, dual=False):
-    
+    '''prints various components of an object result= scipy.optimize.linprog (...)'''
     #print ("best vec : ", result.x)
     k = result.x.shape[0] # size of the graph
 
@@ -339,6 +339,7 @@ def analyse_value_lp(result, dual=False):
 
 
 def Lovasz_random_bound_no_lp():
+    '''tests the value of a random feasible point in two formulations of theta (LP and matrix form)'''
     primes = primes_list(400, only_equal1mod4=True)
     #primes = [13]
     record_min_eig = np.empty(shape=(len(primes),3))

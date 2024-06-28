@@ -5,9 +5,10 @@ import time
 import scipy.stats as stats
 import graphs
 
-# Verifying the following conjecture : the maximum value of a random orthonormal basis (the sup norm of the matrix) is of order sqrt(log(n)/n)
-# (this is true if the following graph is bounded by a constant)
+
 def order_of_max_val_rand_onb():
+    ''' Verifies the following conjecture : the maximum value of a random orthonormal basis (the sup norm of the matrix) is of order sqrt(log(n)/n)
+         (this is true if the following graph is bounded by a constant)'''
     max_val_vec, mean_vec = [], []
     nb_runs = 10
     ran = range(10, 1000, 10)
@@ -25,9 +26,10 @@ def order_of_max_val_rand_onb():
     pp.legend()
     pp.show()
 
-# Verifying that the max value of <x, w_i> is O(1) for w_i in a random orthonormal basis,
-# x the sign vector of the first basis vector, i ranging from 1 to sqrt(n/log(n))
+
 def order_of_max_val_proj_rand_onb():
+    ''' Verifies that the max value of <x, w_i> is O(1) for w_i in a random orthonormal basis,
+     x the sign vector of the first basis vector, i ranging from 1 to sqrt(n/log(n))'''
     max_val_vec, mean_vec = [], []
     nb_runs = 10
     ran = range(10, 1000, 10)
@@ -46,6 +48,7 @@ def order_of_max_val_proj_rand_onb():
     pp.plot(ran, mean_vec, label="averaged over " + str(nb_runs) + " runs", linestyle="-", linewidth=3 )
     pp.legend()
     pp.show()
+
 
 # Draw a random ONB; multiply the first vector by a chi distribution with n dof (call it v);
 # define x = sign(v)*(norm v)^2/(norm v)_1; project x on the first K vectors of the onb;
@@ -194,6 +197,7 @@ def approx_e_i():
     pp.show()
 
 def entropy():
+    '''examines the entropy of a simple vector (to test a mathematical argument) '''
     n = 2900000
     oneoverp = np.linspace(start=1, stop=n, num=100) ; p= 1/oneoverp
     entropy_vec = np.floor(1/p)*p*np.log(1/p) - (1-np.floor(1/p)*p)*np.log(1-np.floor(1/p)*p)

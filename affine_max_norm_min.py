@@ -12,7 +12,10 @@ def random_orthonormal_basis(n):
     return q
 
 def affine_max_norm_min(dim_space, dim_subspace, norm_v=1, Fourier_basis=False, symmetry_constraints=False):
-    
+    ''' examines the behavior of affine max norm minimization, ie.
+    draw a unitary matrix either at random or as the Fourier basis, then take dim_subspace columns at random,
+    define v = sum of the other columns, and find the point in v+span(W) that has the minimum maximum norm
+    ie. find min t s.t. -Wx-t <= v and Wx-t <= -v'''
     if Fourier_basis:
         U = np.real(np.fft.fft(np.eye(dim_space)))/np.sqrt(n)
 
@@ -70,6 +73,8 @@ def affine_max_norm_min(dim_space, dim_subspace, norm_v=1, Fourier_basis=False, 
     return res.fun
 
 def run_sim_varying_dimspace():
+    ''' run affine_max_norm_min while varying the dimension n of the whole space
+     (taking a random subspace of dimension n/2) and plot the corresponding cost'''
     nb_runs, min_n, max_n = 1, 10, 200
     mean_vec_nminus1, mean_vec_nhalf, mean_vec_1 = [], [], [] 
     for n in range (min_n, max_n):
@@ -100,6 +105,8 @@ def run_sim_varying_dimspace():
     pp.show()
 
 def run_sim_varying_dimsubspace():
+    ''' run affine_max_norm_min while varying the dimension of the subspace (number of columns from W)
+     while keeping the dimension of the whole space fixed and plot the corresponding cost'''
     nb_runs= 1
     dim_space = 200
     mean_vec = []
